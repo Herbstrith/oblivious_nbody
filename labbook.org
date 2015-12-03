@@ -1,0 +1,23 @@
+#+TITLE: Herbstrith' Oblivious Nbody Lab Book
+#+LATEX_HEADER: \usepackage[margin=2cm,a4paper]{geometry}
+#+STARTUP: overview indent
+#+TAGS: Lucas(L) Herbstrith(H) noexport(n) deprecated(d) 
+#+EXPORT_SELECT_TAGS: export
+#+EXPORT_EXCLUDE_TAGS: noexport
+
+* Study materials and theories
+** Cuda
+   What every CUDA Programmer Should Know About OpenGL
+   http://www.nvidia.com/content/gtc/documents/1055_gtc09.pdf
+   On Cuda usage of recursive kernels
+   http://developer.download.nvidia.com/assets/cuda/files/CUDADownloads/TechBrief_Dynamic_Parallelism_in_CUDA.pdf
+   http://devblogs.nvidia.com/parallelforall/cuda-dynamic-parallelism-api-principles/
+   
+** Cache oblivious nbody
+  + Presentation
+     https://github.com/CppCon/CppCon2014/blob/master/Presentations/Decomposing%20a%20Problem%20for%20Parallel%20Execution/Decomposing%20a%20Problem%20for%20Parallel%20Execution%20-%20Pablo%20Halpern%20-%20CppCon%202014.
+
+* Algorithm study                                                :Herbstrith:
+  One thing to note is that the algorithm idea is to have less RAM memory access, taking advantage on data locality.
+  As GPU uses GDDR5 RAM, we won't have such an increase in performance as the cpu counterpart. Still data locality is a good thing to experiment on.
+  We are also adding recursion to the algorithm, which the gpu doesn't quite like, and a thread seems to do more work, again because the algorithm was made thinking on cpus.
