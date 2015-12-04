@@ -17,7 +17,26 @@
   + Presentation
      https://github.com/CppCon/CppCon2014/blob/master/Presentations/Decomposing%20a%20Problem%20for%20Parallel%20Execution/Decomposing%20a%20Problem%20for%20Parallel%20Execution%20-%20Pablo%20Halpern%20-%20CppCon%202014.
 
-* Algorithm study                                                :Herbstrith:
+* <03-11-2015> Algorithm study                                   :Herbstrith:
   One thing to note is that the algorithm idea is to have less RAM memory access, taking advantage on data locality.
   As GPU uses GDDR5 RAM, we won't have such an increase in performance as the cpu counterpart. Still data locality is a good thing to experiment on.
   We are also adding recursion to the algorithm, which the gpu doesn't quite like, and a thread seems to do more work, again because the algorithm was made thinking on cpus.
+* <04-11-2015> Algorithm study                                   :Herbstrith:
+An excerpt from the http://http.developer.nvidia.com/GPUGems3/gpugems3_ch31.html article:
+"
+We may think of the all-pairs algorithm as calculating each entry f ij in an NxN grid of all pair-wise forces.[1] Then the total force F i
+(or acceleration a i ) on body i is obtained from the sum of all entries in row i. Each entry can be computed independently, so there is O(N 2)
+available parallelism. However, this approach requires O(N 2) memory and would be substantially limited by memory bandwidth. Instead, we serialize
+some of the computations to achieve the data reuse needed to reach peak performance of the arithmetic units and to reduce the memory bandwidth required.
+
+Consequently, we introduce the notion of a computational tile, a square region of the grid of pair-wise forces consisting of p rows and p columns. 
+Only 2p body descriptions are required to evaluate all p 2 interactions in the tile (p of which can be reused later). These body descriptions can be
+stored in shared memory or in registers. The total effect of the interactions in the tile on the p bodies is captured as an update to p acceleration
+vectors.
+
+To achieve optimal reuse of data, we arrange the computation of a tile so that the interactions in each row are evaluated in sequential order, updating
+the acceleration vector, while the separate rows are evaluated in parallel.
+
+"
+This is a very similar approach to the one proposed in the cache-oblivious algorithm. On both we have the parallel tile notion, and both aim to make reuse of the data.
+Also this one does take in account the gpu architecture.
