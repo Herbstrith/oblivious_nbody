@@ -9,19 +9,20 @@
 ** Cuda
    What every CUDA Programmer Should Know About OpenGL
    http://www.nvidia.com/content/gtc/documents/1055_gtc09.pdf
-   On Cuda usage of recursive kernels
+   On Cuda usage of recursive kernels ( Dynamic Parallelism is only avaiable for devices with a compute capability >= 3.5)
    http://developer.download.nvidia.com/assets/cuda/files/CUDADownloads/TechBrief_Dynamic_Parallelism_in_CUDA.pdf
    http://devblogs.nvidia.com/parallelforall/cuda-dynamic-parallelism-api-principles/
+   Classic
+   https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html
    
 ** Cache oblivious nbody
   + Presentation
-     https://github.com/CppCon/CppCon2014/blob/master/Presentations/Decomposing%20a%20Problem%20for%20Parallel%20Execution/Decomposing%20a%20Problem%20for%20Parallel%20Execution%20-%20Pablo%20Halpern%20-%20CppCon%202014.
-
-* <03-11-2015> Algorithm study                                   :Herbstrith:
+    https://github.com/CppCon/CppCon2014/blob/master/Presentations/ -> Decomposing a problem
+* <03-12-2015> Algorithm study                                   :Herbstrith:
   One thing to note is that the algorithm idea is to have less RAM memory access, taking advantage on data locality.
   As GPU uses GDDR5 RAM, we won't have such an increase in performance as the cpu counterpart. Still data locality is a good thing to experiment on.
   We are also adding recursion to the algorithm, which the gpu doesn't quite like, and a thread seems to do more work, again because the algorithm was made thinking on cpus.
-* <04-11-2015> Algorithm study                                   :Herbstrith:
+* <04-12-2015> Algorithm study                                   :Herbstrith:
 An excerpt from the http://http.developer.nvidia.com/GPUGems3/gpugems3_ch31.html article:
 "
 We may think of the all-pairs algorithm as calculating each entry f ij in an NxN grid of all pair-wise forces.[1] Then the total force F i
@@ -40,3 +41,6 @@ the acceleration vector, while the separate rows are evaluated in parallel.
 "
 This is a very similar approach to the one proposed in the cache-oblivious algorithm. On both we have the parallel tile notion, and both aim to make reuse of the data.
 Also this one does take in account the gpu architecture.
+* <07-12-2015> Meeting Prof Lucas M. Schnorr                     :Herbstrith:
+I was wrong, the algorithm is still a valid idea. My mistake was focusing on the word "Cache", while the algorithm does take advantage of
+cache locality, it also does manage to do only half the calculations (thanks to Newtons third law, represented by the add_force function). 
