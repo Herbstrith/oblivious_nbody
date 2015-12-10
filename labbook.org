@@ -18,6 +18,10 @@
 ** Cache oblivious nbody
   + Presentation
     https://github.com/CppCon/CppCon2014/blob/master/Presentations/ -> Decomposing a problem
+
+** GEMS3 nbody
+http://http.developer.nvidia.com/GPUGems3/gpugems3_ch31.html
+
 * <03-12-2015> Algorithm study                                   :Herbstrith:
   One thing to note is that the algorithm idea is to have less RAM memory access, taking advantage on data locality.
   As GPU uses GDDR5 RAM, we won't have such an increase in performance as the cpu counterpart. Still data locality is a good thing to experiment on.
@@ -133,3 +137,15 @@ These shouldnt change much.
 threads and thread blocks. This would give us an excelent boost on performance.
 We also woll try the naive way by making use of the dynamic parallelism, but this
 approach would have some overhead, and wouldn't have a good result as the first.
+* <10-12-2015> Cuda Implementation
+** Dynamic Parallelism
+ We shall start by making a version that makes use of the Dinamyc Parallelism, which should be easier to implement.
+ This version will be very similar to the Cache Oblivious implementation, so we might not have as much as an increase
+ performance.
+ We will represent the data in a similar fashion to the GEMS3 nbody, so we can compare to it on a first analisys.
+** Cuda Native
+ This version we will try to take a new approach to the algorithm, taking in consideration the GPU architecture.
+ One first idea is to move diagonally in the grid at each iteration. This would lead to a low work load on the first
+ iterations and increase it as the computation goes. We could also think of ways of getting work from the "middle"
+ tiles, trying to have more  work on the first iterations.
+ 
