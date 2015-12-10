@@ -30,5 +30,5 @@ cuda_add_executable(
 # For linking ...
 # Specify target & libraries to link it with
 target_link_libraries(
-    gems
+    oblivious_nbody
     )

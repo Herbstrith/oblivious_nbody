@@ -1,10 +1,10 @@
 
 
 
-// calculate_forces kernel function
+// calculate_forces kernel function ... here is where we start
 
-// triangle kernel function
+// rectangle kernel function ( without coarsening )
 
-// rectangle kernel function
+//calculate_force: body x body interaction
 
 // add_force kernel function
