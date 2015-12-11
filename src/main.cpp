@@ -54,6 +54,38 @@ void copyArrayToDevice(float *device, const float *host, int num_bodies) {
 }
 
 
+void randomizeBodies(float *pos, float *vel, int num_bodies) {
+  int i = 0;
+  int p_index = 0, v_index = 0;
+  while (i < num_bodies) {
+    float3 point;
+    float3 velocity;
+    
+    point.x = rand();
+    point.y = rand();
+    point.z = rand();
+
+    velocity.x = rand();
+    velocity.y = rand();
+    velocity.z = rand();
+    
+    pos[p++] = point.x;
+    pos[p++] = point.y;
+    pos[p++] = point.z;
+    pos[p++] = 1.0f;  // this is the mass
+
+    vel[v++] = velocity.x;
+    vel[v++] = velocity.y;
+    vel[v++] = velocity.z;
+    vel[v++] = 1.0f; // inverse mass
+
+    i++;
+    
+  }
+  
+}
+
+
 int main(int argc, char** argv) {
     int num_iterations = 1;
     int num_bodies = 1000;
@@ -64,10 +96,15 @@ int main(int argc, char** argv) {
 
     init(num_bodies);
 
-    // Generate a random set of bodies (size numBodies
+    // Generate a random set of bodies (size numBodies)
 
+    randomizeBodies(m_hPos, m_hVel, num_bodies);
+    
     // Move data to GPU
 
+    copyArrayToDevice(m_dPos, m_hPos, num_bodies);
+    copyArrayToDevice(m_dVel, m_hVel, num_bodies);
+    
     // run kernel
 
     // clean up and finish
