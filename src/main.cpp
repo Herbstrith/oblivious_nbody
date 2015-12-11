@@ -69,15 +69,15 @@ void randomizeBodies(float *pos, float *vel, int num_bodies) {
     velocity.y = rand();
     velocity.z = rand();
     
-    pos[p++] = point.x;
-    pos[p++] = point.y;
-    pos[p++] = point.z;
-    pos[p++] = 1.0f;  // this is the mass
+    pos[p_index++] = point.x;
+    pos[p_index++] = point.y;
+    pos[p_index++] = point.z;
+    pos[p_index++] = 1.0f;  // this is the mass
 
-    vel[v++] = velocity.x;
-    vel[v++] = velocity.y;
-    vel[v++] = velocity.z;
-    vel[v++] = 1.0f; // inverse mass
+    vel[v_index++] = velocity.x;
+    vel[v_index++] = velocity.y;
+    vel[v_index++] = velocity.z;
+    vel[v_index++] = 1.0f; // inverse mass
 
     i++;
     
@@ -102,12 +102,18 @@ int main(int argc, char** argv) {
     
     // Move data to GPU
 
-    copyArrayToDevice(m_dPos, m_hPos, num_bodies);
-    copyArrayToDevice(m_dVel, m_hVel, num_bodies);
+    copyArrayToDevice(*m_dPos, m_hPos, num_bodies);
+    copyArrayToDevice(*m_dVel, m_hVel, num_bodies);
     
     // run kernel
 
     // clean up and finish
 
+    if (m_hPos)
+      delete [] m_hPos;
+
+    if (m_hVel)
+      delete [] m_hVel;
+    
     return 0;
 }
