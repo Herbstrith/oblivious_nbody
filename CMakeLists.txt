@@ -24,6 +24,7 @@ link_directories(
 cuda_add_executable(
     oblivious_nbody
     src/nbody_kernel.cu
+    src/nbody_kernel.cuh
     src/main.cpp
     )
 

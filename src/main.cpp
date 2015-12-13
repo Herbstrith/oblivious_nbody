@@ -10,7 +10,7 @@
 #include <cuda_runtime_api.h>
 #include <cuda.h>
 
-#include "nbody_kernel.cu"
+#include "nbody_kernel.cuh"
 
 // for time measurement
 clock_t start, end;
