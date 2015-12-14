@@ -6,7 +6,7 @@ find_package(CUDA QUIET REQUIRED)
 # Pass options to NVCC
 set(
   CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
-  -O3 -gencode arch=compute_30,code=sm_30
+  -O3 -gencode arch=compute_35,code=sm_35 -rdc=true
   )
 
 # Specify include directories
