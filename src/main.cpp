@@ -85,6 +85,32 @@ void randomizeBodies(float *pos, float *vel, int num_bodies) {
   
 }
 
+void runNbodySimulation(int num_iterations, int num_bodies) {
+  
+  cudaEvent_t startEvent, stopEvent;
+  cudaEvent_t startEventIteration, stopEventIteration;
+  
+  cudaEventRecord(startEvent, 0);
+  for (int i =0; i < num_iterations; i++) {
+    float milliseconds_iteration = 0;
+    cudaEventRecord(startEventIteration, 0);
+
+    calculate_forces(num_bodies, (float4*)m_dVel[0]); 
+
+    cudaEventRecord(stopEventIteration, 0);
+    cudaEventSynchronize(stopEventIteration);
+    cudaEventElapsedTime(&milliseconds_iteration, startEventIteration, stopEventIteration);
+    printf("%.3f iteration\n", milliseconds_iteration);
+  }
+  float milliseconds = 0;
+
+  cudaEventRecord(stopEvent, 0);
+  cudaEventSynchronize(stopEvent);
+  cudaEventElapsedTime(&milliseconds, startEvent, stopEvent);
+
+  printf("%.3f gputime\n", milliseconds);
+}
+
 
 int main(int argc, char** argv) {
     int num_iterations = 1;
@@ -107,6 +133,7 @@ int main(int argc, char** argv) {
     
     // run kernel
 
+    runNbodySimulation(num_iterations, num_bodies);
     // clean up and finish
 
     if (m_hPos)
