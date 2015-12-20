@@ -14,7 +14,11 @@
    http://devblogs.nvidia.com/parallelforall/cuda-dynamic-parallelism-api-principles/
    Classic
    https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html
-   
+   Dybanuc Paralelism simple example
+   http://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/advanced-gpu/adv-gpu-dynpar.pdf?__blob=publicationFile
+   Cuda C Programming Guide
+   http://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf  ( Appendix C, pg 140, for dynamic parallelism)
+
 ** Cache oblivious nbody
   + Presentation
     https://github.com/CppCon/CppCon2014/blob/master/Presentations/ -> Decomposing a problem
@@ -149,3 +153,17 @@ approach would have some overhead, and wouldn't have a good result as the first.
  iterations and increase it as the computation goes. We could also think of ways of getting work from the "middle"
  tiles, trying to have more  work on the first iterations.
  
+* <19-12-2015> Running on Orion
+ Some many problems appeared here.
+ In the end, to compile i used the following commands:
+ nvcc -arch=sm_35 -rdc=true -c nbody_kernel.cu
+ nvcc -arch=sm_35 -dlink -o nbody_kernel_link.o nbody_kernel.o -lcudadevrt -lcudart
+ g++ nbody_kernel.o nbody_kernel_link.o main.cpp -L/usr/local/cuda/lib64/ -lcudart -lcudadevrt
+
+ Also needed to set export LD_LIBRARY_PATH=/usr/local/cuda-7.0/lib64:$LD_LIBRARY_PATH
+ But still got the following error: FATAL: Error inserting nvidia_340_uvm : invalid argument
+
+ After some more cuda exploring, i managed to run a dynamic paralel example on my gtx 760. So i can
+ use my machine for compiling and running the code ( i tought the error's i had received were due to
+ the gtx 760 not having a  3.5 cc). This same code would generate the same error as mentioned before
+ on the orion machine. Now we need to fix this.
