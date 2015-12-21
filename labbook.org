@@ -14,7 +14,7 @@
    http://devblogs.nvidia.com/parallelforall/cuda-dynamic-parallelism-api-principles/
    Classic
    https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html
-   Dybanuc Paralelism simple example
+   Dynamic Parallelism simple example
    http://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/advanced-gpu/adv-gpu-dynpar.pdf?__blob=publicationFile
    Cuda C Programming Guide
    http://docs.nvidia.com/cuda/pdf/CUDA_C_Programming_Guide.pdf  ( Appendix C, pg 140, for dynamic parallelism)
@@ -167,3 +167,6 @@ approach would have some overhead, and wouldn't have a good result as the first.
  use my machine for compiling and running the code ( i tought the error's i had received were due to
  the gtx 760 not having a  3.5 cc). This same code would generate the same error as mentioned before
  on the orion machine. Now we need to fix this.
+ 
+ And an approach to compile using just a Makefile can was found here:
+ http://stackoverflow.com/questions/28719927/dynamic-parallelism-separate-compilation-undefined-reference-to-cudaregiste
