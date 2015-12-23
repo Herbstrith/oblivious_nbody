@@ -43,8 +43,19 @@ main.o : src/main.cpp
 	gcc $(CFLAGS) -c -O3 src/main.cpp -o $(BUILD_DIR)/main.o -L/usr/lib64 -lstdc++
 
 Nbody: main.o nbody_kernel.o
-	nvcc $(CUDAFLAGS) $(CUDA_INCLUDE_DIR) -dlink $(BUILD_DIR)/main.o $(BUILD_DIR)/nbody_kernel.o -lcudadevrt -o $(BUILD_DIR)/link.o
-	gcc $(CFLAGS) $(BUILD_DIR)/main.o $(BUILD_DIR)/nbody_kernel.o $(BUILD_DIR)/link.o -lcudadevrt $(CUDA_LIB_DIR)  $(CUDALIBS) -o Nbody -lcudart -L/usr/lib64 -lstdc++		
+	nvcc $(CUDAFLAGS) $(CUDA_INCLUDE_DIR) -dlink $(BUILD_DIR)/main.o $(BUILD_DIR)/nbody_kernel.o -o $(BUILD_DIR)/link.o
+	gcc $(CFLAGS) $(BUILD_DIR)/main.o $(BUILD_DIR)/nbody_kernel.o $(BUILD_DIR)/link.o -lcudadevrt $(CUDA_LIB_DIR)  $(CUDALIBS) -o Nbody -lcudart -L/usr/lib64 -lstdc++
+
+#compiling on lesser than 3.5 cuda capables gpu's
+
+nbody_kernel2.o: src/nbody_kernel.cu
+	nvcc -arch=sm_30  $(CUDA_INCLUDE_DIR) -c -O3  src/nbody_kernel.cu -o $(BUILD_DIR)/nbody_kernel2.o
+
+Nbody2: main.o nbody_kernel2.o
+	nvcc -arch=sm_30 $(CUDA_INCLUDE_DIR) -dlink $(BUILD_DIR)/main.o $(BUILD_DIR)/nbody_kernel2.o  -o $(BUILD_DIR)/link.o
+	gcc $(CFLAGS) $(BUILD_DIR)/main.o $(BUILD_DIR)/nbody_kernel2.o $(BUILD_DIR)/link.o  $(CUDA_LIB_DIR)  $(CUDALIBS) -o Nbody -lcudart -L/usr/lib64 -lstdc++
+
+
 ####################
 #misc
 ####################

@@ -170,3 +170,15 @@ approach would have some overhead, and wouldn't have a good result as the first.
  
  And an approach to compile using just a Makefile can was found here:
  http://stackoverflow.com/questions/28719927/dynamic-parallelism-separate-compilation-undefined-reference-to-cudaregiste
+* <21-12-2015> Cuda and the debug process
+ Learning the Cuda way to error checking is  extremelly important, as error's due to cuda calls are silent otherwise.
+ http://codeyarns.com/2011/03/02/how-to-do-error-checking-in-cuda/
+ https://code.google.com/p/stanford-cs193g-sp2010/wiki/TutorialWhenSomethingGoesWrong
+ 
+ cuda-memcheck is a helpfull tool for debugging
+ cuda-gdb requires 2 gpu to work or not using the gpu on the system graphic interface
+* <23-12-2015> Cuda compilation on gtx 760
+ So it does matter the architecture version on the compilation. Even thought the program does compile
+ when making the cuda calls during the program execution we will have silent errors. One thing to keep
+ in mind is that even when using the proper cuda error checking we just receive an "Unknown error" message
+ , due to compiling for the wrong architecture.
