@@ -30,6 +30,17 @@ static double gettime(void) {
   return (double)tr.tv_sec+(double)tr.tv_usec/1000000;
 }
 
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
+
 
 void init(int num_bodies) {
   // allocate cpu memory
@@ -40,17 +51,17 @@ void init(int num_bodies) {
   unsigned int memSize = sizeof( float) * 4 * num_bodies;
 
   // allocate gpu memory
-  cudaMalloc((void**)&m_dVel[0], memSize);
-  cudaMalloc((void**)&m_dVel[1], memSize);
+  gpuErrchk(cudaMalloc((void**)&m_dVel[0], memSize));
+  gpuErrchk(cudaMalloc((void**)&m_dVel[1], memSize));
 
-  cudaMalloc((void**)&m_dPos[0], memSize);
-  cudaMalloc((void**)&m_dPos[1], memSize);
+  gpuErrchk(cudaMalloc((void**)&m_dPos[0], memSize));
+  gpuErrchk(cudaMalloc((void**)&m_dPos[1], memSize));
   
 }
 
 // copy array from the host (CPU) to the device (GPU)
 void copyArrayToDevice(float *device, const float *host, int num_bodies) {
-  cudaMemcpy(device, host, num_bodies * 4 * sizeof(float), cudaMemcpyHostToDevice);
+  gpuErrchk(cudaMemcpy(device, host, num_bodies * 4 * sizeof(float), cudaMemcpyHostToDevice));
 }
 
 
@@ -90,23 +101,25 @@ void runNbodySimulation(int num_iterations, int num_bodies) {
   cudaEvent_t startEvent, stopEvent;
   cudaEvent_t startEventIteration, stopEventIteration;
   
-  cudaEventRecord(startEvent, 0);
+  gpuErrchk(cudaEventRecord(startEvent, 0));
+  printf("Starting iterations \n \n");
   for (int i =0; i < num_iterations; i++) {
     float milliseconds_iteration = 0;
-    cudaEventRecord(startEventIteration, 0);
+    gpuErrchk(cudaEventRecord(startEventIteration, 0));
+      printf("Start execution \n  \n \n ");
 
     calculate_forces(num_bodies, (float4*)m_dVel[0]); 
 
-    cudaEventRecord(stopEventIteration, 0);
-    cudaEventSynchronize(stopEventIteration);
-    cudaEventElapsedTime(&milliseconds_iteration, startEventIteration, stopEventIteration);
+    gpuErrchk(cudaEventRecord(stopEventIteration, 0));
+    gpuErrchk(cudaEventSynchronize(stopEventIteration));
+    gpuErrchk(cudaEventElapsedTime(&milliseconds_iteration, startEventIteration, stopEventIteration));
     printf("%.3f iteration\n", milliseconds_iteration);
   }
   float milliseconds = 0;
 
-  cudaEventRecord(stopEvent, 0);
-  cudaEventSynchronize(stopEvent);
-  cudaEventElapsedTime(&milliseconds, startEvent, stopEvent);
+  gpuErrchk(cudaEventRecord(stopEvent, 0));
+  gpuErrchk(cudaEventSynchronize(stopEvent));
+  gpuErrchk(cudaEventElapsedTime(&milliseconds, startEvent, stopEvent));
 
   printf("%.3f gputime\n", milliseconds);
 }
@@ -119,7 +132,7 @@ int main(int argc, char** argv) {
     sscanf(argv[1], "%d", &num_bodies);
     sscanf(argv[2], "%d", &num_iterations);
 
-
+    printf("initializing bodies \n");
     init(num_bodies);
 
     // Generate a random set of bodies (size numBodies)
@@ -127,20 +140,23 @@ int main(int argc, char** argv) {
     randomizeBodies(m_hPos, m_hVel, num_bodies);
     
     // Move data to GPU
-
+    printf("Moving data to GPU \n");
     copyArrayToDevice(*m_dPos, m_hPos, num_bodies);
     copyArrayToDevice(*m_dVel, m_hVel, num_bodies);
     
     // run kernel
-
+    printf("Kernel start \n");
     runNbodySimulation(num_iterations, num_bodies);
     // clean up and finish
-
+    printf("Finishing execution\n");
     if (m_hPos)
       delete [] m_hPos;
 
     if (m_hVel)
       delete [] m_hVel;
+
+    // clean up the gpu
+    gpuErrchk(cudaDeviceReset());
     
     return 0;
 }
