@@ -182,3 +182,19 @@ approach would have some overhead, and wouldn't have a good result as the first.
  when making the cuda calls during the program execution we will have silent errors. One thing to keep
  in mind is that even when using the proper cuda error checking we just receive an "Unknown error" message
  , due to compiling for the wrong architecture.
+* <30-12-2015> Cuda compilation on k20
+After a week trying many makefile configurations and cmake configurations. Nothing worked.
+ But then after trying to run a simple code, even that didn't worked. After all
+ the problem is in the machine configuration it seems. Lessons learned: cuda compilation
+ aint that complicated and the developer MUST make use of an error checking function on his code.
+* <31-12-2015> No recursion Algorithm 
+ An approach to the Half Work idea but without the recursion.
+ We have to move diagonally, so we need to feed our threads blocks a contiguous diagonal list
+ so that they can be all computated on parallel. For that we will use a component (function) that will return
+ a Vector4 that will return the line dimensions when a block asks. For every time the function is update we have
+ to atomically update it's value as well (Affect the  performance). 
+ 
+* <01-01-2016> Implementing the Algorithm
+I'll use the cuda Gems3 nbody code and just change the actuall kernel.
+This will also simplificate the performance analisys and make it more accurate, since
+we will be using the same data structures and initialization.
