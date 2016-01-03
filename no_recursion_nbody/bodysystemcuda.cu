@@ -225,30 +225,55 @@ InitializeDiagonalManagerVector(typename vec4<T>::Type *diagonalManagerVector, i
   // start i
   WorkRange.x = numBodies;
   // start j
-  WorkRange.z = 0;
+  WorkRange.y = numBodies;
   // end i
-  WorkRange.y = 0;
+  WorkRange.z = 0;
   // end j
-  WorkRange.w = numBodies;
+  WorkRange.w = 0 + blockSize;
   
 }
-
 
 
 template <typename T>
 __device__ typename vec4<T>::Type
-GetDiagonalLine(typename vec4<T>::Type *diagonalManagerVector, int blockSize)
+GetDiagonalLine(typename vec4<T>::Type *diagonalManagerVector, int blockSize, unsigned int deviceNumBodies)
 {
   //load the manager vector
-
+  typename vec4<T>::Type returnVector;
+  
   //get the first avaiable block
+  // start atomic -------- (atomic between blocks)
+  returnVector = diagonalManagerVector;
 
   //update the manager vector  and attribute it to the return vector -- Atomic --
+  if(diagonalManagerVector.w >= deviceNumBodies) {
+      diagonalManagerVector.y = diagonalManagerVector.y - 1;
+      diagonalManagerVector.x = diagonalManagerVector.y;
 
-  //return a vector with the range
+      diagonalManagerVector.z = diagonalManagerVector.w;
+      diagonalManagerVector.w = 0;
+
+  } else {
+    // no changes to the i
+
+    //check if we are not out of bounds
+    diagonalManagerVector.z = diagonalManagerVector.w;
+    diagonalManagerVector.w = (diagonalManagerVector.w + blockSize < deviceNumBodies) ? diagonalManagerVector.y + blockSize : deviceNumBodies;
+  }
   
+  // end atomic ---------
+  
+  //return a vector with the range
+  return returnVector;
 }
 
+
+template<typename T>
+__device__ void
+CalculateForces(typename vec4<T>::Type pos, typename vec4<T>::Type *__restrict__ oldPos)
+{
+
+}
 
 
 /* Integrate the bodies by doing only half the works thanks to newtons third law : by Herbstrith */
@@ -260,31 +285,46 @@ integrateBodiesHalfWork(typename vec4<T>::Type *__restrict__ newPos,
                 unsigned int deviceOffset, unsigned int deviceNumBodies,
                 float deltaTime, float damping, int numTiles)
 {
-  bool StillWorking = true;
- 
+  // these will be shared between the threads
+  __shared__ bool stillWorking = true;
+  __shared__ bool receivedNewDiagonal = false;
   // x = i start, y = i end, z = j start, w = j end
   typename vec4<T>::Type workRange;
 
   // ask for a diagonal line
   
-  while ( StillWorking ) {
+  while ( stillWorking ) {
 
     //  TODO: input the right formula to the index
     // int index = blockIdx.x * blockDim.x + threadIdx.x;
+    typename vec2<T>::Type index;
+    index.i = workRange.x - threadIdx.x;
+    index.j = workRange.z + threadIdx.x;
 
+    int index = (workRange.x - threadIdx.x)*deviceNumBodies + workRange.z + threadIdx.x;
+    typename vec4<T>::Type position = oldPos[deviceOffset + index];
+
+    
     // calculate  the index particle force on the system... also returns the resulting force on this particle
-    typename vec3<T>::Type accel = CalculateForces(index, position,oldPos);
+    typename vec3<T>::Type accel = CalculateForces(position,oldPos);
     
     typename vec4<T>::Type position = oldPos[deviceOffset + index];
 
     //sync threads
 
+    
     // one threads ask for more data ... others will idle (busy waiting)
+    receivedNewDiagonal = false;
     if (threadIdx.x == 1) {
       workRange = GetDiagonalLine();  // this will be shared between all the threads
-
+      receivedNewDiagonal = true;
+      //nothing else to work
+      if (workRange.x < 0)
+      {
+        StillWorking = false;
+      }
     } else {
-      while() continue;   
+      while(!receivedNewDiagonal) continue;   
     }
     
     // check if we got more data ... else finished working
