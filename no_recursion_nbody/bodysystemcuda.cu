@@ -236,35 +236,51 @@ InitializeDiagonalManagerVector(typename vec4<T>::Type *diagonalManagerVector, i
 
 template <typename T>
 __device__ typename vec4<T>::Type
-GetDiagonalLine(typename vec4<T>::Type *diagonalManagerVector, int blockSize, unsigned int deviceNumBodies)
+GetDiagonalLine(typename vec4<T>::Type *diagonalManagerVector, int blockSize, unsigned int deviceNumBodies, unsigned long long* mutex)
 {
   //load the manager vector
   typename vec4<T>::Type returnVector;
   
   //get the first avaiable block
   // start atomic -------- (atomic between blocks)
-  returnVector = diagonalManagerVector;
+  bool isSet = false;
+   do 
+    {
+        if (isSet = atomicCAS(mutex, 0, 1) == 0) 
+        {
+            // critical section
+          returnVector = diagonalManagerVector;
+  
+          //update the manager vector  and attribute it to the return vector -- Atomic --
+          if(diagonalManagerVector->w >= deviceNumBodies) {
+            diagonalManagerVector->y = diagonalManagerVector->y - 1;
+            diagonalManagerVector->x = diagonalManagerVector->y;
 
-  //update the manager vector  and attribute it to the return vector -- Atomic --
-  if(diagonalManagerVector->w >= deviceNumBodies) {
-      diagonalManagerVector->y = diagonalManagerVector->y - 1;
-      diagonalManagerVector->x = diagonalManagerVector->y;
+            diagonalManagerVector->z = diagonalManagerVector->w;
+            diagonalManagerVector->w = 0;
 
-      diagonalManagerVector->z = diagonalManagerVector->w;
-      diagonalManagerVector->w = 0;
+          } else {
+            // no changes to the i
 
-  } else {
-    // no changes to the i
-
-    //check if we are not out of bounds
-    diagonalManagerVector->z = diagonalManagerVector->w;
-    diagonalManagerVector->w = (diagonalManagerVector->w + blockSize < deviceNumBodies) ? diagonalManagerVector->y + blockSize : deviceNumBodies;
-  }
+            //check if we are not out of bounds
+            diagonalManagerVector->z = diagonalManagerVector->w;
+            diagonalManagerVector->w = (diagonalManagerVector->w + blockSize < deviceNumBodies) ? diagonalManagerVector->y + blockSize : deviceNumBodies;
+          }
+          
+        }
+        if (isSet) 
+        {
+            mutex = 0;
+        }
+    } 
+    while (!isSet);
+  
   
   // end atomic ---------
   
   //return a vector with the range
   return returnVector;
+  
 }
 
 
@@ -325,10 +341,11 @@ CalculateForces(typename vec3<T>::Type index, typename vec4<T>::Type *__restrict
 template<typename T>
 __global__ void
 integrateBodiesHalfWork(typename vec4<T>::Type *__restrict__ newPos,
-                typename vec4<T>::Type *__restrict__ oldPos,
-                typename vec4<T>::Type *vel,
-                unsigned int deviceOffset, unsigned int deviceNumBodies,
-                float deltaTime, float damping, int numTiles,  typename vec4<T>::Type *diagonalManagerVector)
+                        typename vec4<T>::Type *__restrict__ oldPos,
+                        typename vec4<T>::Type *vel,
+                        unsigned int deviceOffset, unsigned int deviceNumBodies,
+                        float deltaTime, float damping, int numTiles,  typename vec4<T>::Type *diagonalManagerVector,
+                        unsigned long long* mutex  )
 {
   // these will be shared between the threads
   __shared__ bool stillWorking;
@@ -349,7 +366,7 @@ integrateBodiesHalfWork(typename vec4<T>::Type *__restrict__ newPos,
     index.j = workRange.z + threadIdx.x;
    
     
-    // calculate  the index particle tile  on the system...
+    // calculate  the index particle tile  on the system... each thread will work on numTiles particles
     typename vec3<T>::Type accel = CalculateForces(index,oldPos, numTiles);
     
 
@@ -360,7 +377,7 @@ integrateBodiesHalfWork(typename vec4<T>::Type *__restrict__ newPos,
     // one threads ask for more data ... others will idle (busy waiting)
     receivedNewDiagonal = false;
     if (threadIdx.x == 1) {
-      workRange = GetDiagonalLine(diagonalManagerVector, numTiles, deviceNumBodies);  // this will be shared between all the threads
+      workRange = GetDiagonalLine(diagonalManagerVector, numTiles, deviceNumBodies, mutex);  // this will be shared between all the threads
       receivedNewDiagonal = true;
       //nothing else to work
       if (workRange.x < 0)
