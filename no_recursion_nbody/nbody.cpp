@@ -539,17 +539,13 @@ main(int argc, char **argv)
     {
         numIterations = getCmdLineArgumentInt(argc, (const char **)argv, "numiterations");
     }
-   t1 = gettime();
-    //printf( "---Timestamp init variable and args : %f\n", ((double)tr_end.tv_sec+(double)tr_end.tv_usec/1000000) - ((double)tr_start.tv_sec+(double)tr_start.tv_usec/1000000) );
+    
+    t1 = gettime();
 
     // Create the demo -- either double (fp64) or float (fp32, default) implementation
     NBodyDemo<float>::Create();
 
-    //printf( "---Timestamp create class : %f\n", ((double)tr_end.tv_sec+(double)tr_end.tv_usec/1000000) - ((double)tr_start.tv_sec+(double)tr_start.tv_usec/1000000) );
-
     NBodyDemo<float>::init(numBodies, numDevsRequested, blockSize, !(benchmark || compareToCPU || useHostMem), useHostMem, useCpu);
-
-    //printf( "---Timestamp initialize class(malloc) : %f\n", ((double)tr_end.tv_sec+(double)tr_end.tv_usec/1000000) - ((double)tr_start.tv_sec+(double)tr_start.tv_usec/1000000) );
 
     NBodyDemo<float>::reset(numBodies, NBODY_CONFIG_SHELL);
 
@@ -559,17 +555,12 @@ main(int argc, char **argv)
     {
         numIterations = 10;
     }
-    //printf( "---Timestamp before processing: %f\n", ((double)tr_end.tv_sec+(double)tr_end.tv_usec/1000000) - ((double)tr_start.tv_sec+(double)tr_start.tv_usec/1000000)* );
+
     NBodyDemo<float>::runBenchmark(numIterations);
-
-    //printf( "---Timestamp after processing: %f\n", ((double)tr_end.tv_sec+(double)tr_end.tv_usec/1000000) - ((double)tr_start.tv_sec+(double)tr_start.tv_usec/1000000) );
-
 
     finalize();
 
-   // printf( "%f runtime \n", (((double)tr_end.tv_sec+(double)tr_end.tv_usec/1000000) - ((double)tr_start.tv_sec+(double)tr_start.tv_usec/1000000))*timeFactor );
-      printf("%f runtime \n", (gettime() - t1)*1000);
-    //printf( "---total time application : %f\n", ((double)tr_app_end.tv_sec+(double)tr_app_end.tv_usec/1000000) - ((double)tr_app_start.tv_sec+(double)tr_app_start.tv_usec/1000000) );
+    printf("%f runtime \n", (gettime() - t1)*1000);
 
     // cudaDeviceReset causes the driver to clean up all state. While
     // not mandatory in normal operation, it is good practice.  It is also
@@ -578,4 +569,5 @@ main(int argc, char **argv)
     // flushed before the application exits
     cudaDeviceReset();
     exit(0);
+    
 }

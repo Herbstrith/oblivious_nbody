@@ -217,101 +217,33 @@ integrateBodies(typename vec4<T>::Type *__restrict__ newPos,
 
 /* ----------------------------------------------- half the work --------------------------------------------*/
 
-template<typename T>
-__global__ void
-InitializeDiagonalManagerVector(typename vec4<T>::Type *diagonalManagerVector, int numBodies, int blockSize)
-{
-  typename vec4<T>::Type WorkRange;
-  // start i
-  WorkRange.x = numBodies;
-  // start j
-  WorkRange.y = numBodies;
-  // end i
-  WorkRange.z = 0;
-  // end j
-  WorkRange.w = 0 + blockSize;
-  
-}
-
-
-template <typename T>
-__device__ typename vec4<T>::Type
-GetDiagonalLine(typename vec4<T>::Type *diagonalManagerVector, int blockSize, unsigned int deviceNumBodies, unsigned long long* mutex)
-{
-  //load the manager vector
-  typename vec4<T>::Type returnVector;
-  
-  //get the first avaiable block
-  // start atomic -------- (atomic between blocks)
-  bool isSet = false;
-   do 
-    {
-        if (isSet = atomicCAS(mutex, 0, 1) == 0) 
-        {
-            // critical section
-          returnVector = diagonalManagerVector;
-  
-          //update the manager vector  and attribute it to the return vector -- Atomic --
-          if(diagonalManagerVector->w >= deviceNumBodies) {
-            diagonalManagerVector->y = diagonalManagerVector->y - 1;
-            diagonalManagerVector->x = diagonalManagerVector->y;
-
-            diagonalManagerVector->z = diagonalManagerVector->w;
-            diagonalManagerVector->w = 0;
-
-          } else {
-            // no changes to the i
-
-            //check if we are not out of bounds
-            diagonalManagerVector->z = diagonalManagerVector->w;
-            diagonalManagerVector->w = (diagonalManagerVector->w + blockSize < deviceNumBodies) ? diagonalManagerVector->y + blockSize : deviceNumBodies;
-          }
-          
-        }
-        if (isSet) 
-        {
-            mutex = 0;
-        }
-    } 
-    while (!isSet);
-  
-  
-  // end atomic ---------
-  
-  //return a vector with the range
-  return returnVector;
-  
-}
-
-
 
 template<typename T>
 __device__ void
 CalculateForces(typename vec3<T>::Type index, typename vec4<T>::Type *__restrict__ oldPos, int numTiles, unsigned int deviceOffset, unsigned int deviceNumBodies, float deltaTime, float damping, typename vec4<T>::Type *vel)
 {
-  typename vec4<T>::Type *sharedPos = SharedMemory<typename vec4<T>::Type>();
 
   // work on the tile
   for (int tile_i = 0; tile_i < numTiles; tile_i++)
   {
-    int index_i = (index.x - tile_i)*deviceNumBodies + (index.y  + tile_i);
-    typename vec4<T>::Type pos_i = oldPos[deviceOffset + index_i];
+    int index_i = (index.x - tile_i - index.y)*deviceNumBodies + (index.y  + tile_i);
+    typename vec4<T>::Type pos_i = oldPos[index_i];
     
     for (int tile_j = tile_i+1; tile_j < numTiles; tile_j++) 
     {
-      int index_j = (index.x - tile_j)*deviceNumBodies + (index.y  + tile_j);
-      typename vec4<T>::Type pos_j = oldPos[deviceOffset + index_j];
+      int index_j = (index.x - tile_j - index.y)*deviceNumBodies + (index.y  + tile_j);
+      typename vec4<T>::Type pos_j = oldPos[index_j];
 
       typename vec3<T>::Type accel = {0.0f, 0.0f, 0.0f};
 
       //aceleration, body 1 , body 2
-      accel = bodyBodyInteraction(accel, pos_i, pos_j);
+      accel = bodyBodyInteraction<T>(accel, pos_i, pos_j);
 
       // acceleration = force / mass;
       // new velocity = old velocity + acceleration * deltaTime
       // note we factor out the body's mass from the equation, here and in bodyBodyInteraction
       // (because they cancel out).  Thus here force == acceleration
-      typename vec4<T>::Type velocity = vel[deviceOffset + index];
+      typename vec4<T>::Type velocity = vel[deviceOffset + index_i];
     
       velocity.x += accel.x * deltaTime;
       velocity.y += accel.y * deltaTime;
@@ -326,7 +258,7 @@ CalculateForces(typename vec3<T>::Type index, typename vec4<T>::Type *__restrict
       pos_i.y += velocity.y * deltaTime;
       pos_i.z += velocity.z * deltaTime;
     
-      // we also update the second particle with the inverse force (velocity)
+      // we also update the second particle with the inverse force (velocity) by the principle of newtons third law
       pos_j.x += -velocity.x * deltaTime;
       pos_j.y += -velocity.y * deltaTime;
       pos_j.z += -velocity.z * deltaTime;
@@ -336,7 +268,11 @@ CalculateForces(typename vec3<T>::Type index, typename vec4<T>::Type *__restrict
   
 }
 
-
+// global variable   -- not the best place for it to be --
+__device__ int diagonalCounter_i;
+__device__ int block_atomic;  
+__device__ bool stillWorking;
+__device__ int actualNumBlocks;
 /* Integrate the bodies by doing only half the works thanks to newtons third law : by Herbstrith */
 template<typename T>
 __global__ void
@@ -344,51 +280,98 @@ integrateBodiesHalfWork(typename vec4<T>::Type *__restrict__ newPos,
                         typename vec4<T>::Type *__restrict__ oldPos,
                         typename vec4<T>::Type *vel,
                         unsigned int deviceOffset, unsigned int deviceNumBodies,
-                        float deltaTime, float damping, int numTiles,  typename vec4<T>::Type *diagonalManagerVector,
-                        unsigned long long* mutex  )
+                        float deltaTime, float damping, int numTiles,
+                        int blockSize, int numBlocks)
 {
-  // these will be shared between the threads
-  __shared__ bool stillWorking;
-  __shared__ bool receivedNewDiagonal;
+  // will be shared between the threads
   stillWorking = true;
-  receivedNewDiagonal = false;
-  // x = i start, y = i end, z = j start, w = j end
-  typename vec4<T>::Type workRange;
+  block_atomic = 0;
+  actualNumBlocks = numBlocks;
+  diagonalCounter_i = deviceNumBodies;
+  __shared__ int diagonalCounter_j;
+  diagonalCounter_j = 0;
+  __shared__ bool blockEnd;
+  blockEnd = false;
   
-  // ask for a diagonal line
+  int j_end = blockSize * blockIdx.x + blockSize + (numBlocks*blockSize*diagonalCounter_j);
+  j_end = ( j_end > deviceNumBodies) ? deviceNumBodies : j_end;
+  
+  // x = i start, y = i end, z = j start, w = j end
+  __shared__ typename vec4<T>::Type workRange;
+     
+  workRange.x = deviceNumBodies - diagonalCounter_i;
+  workRange.y = deviceNumBodies -diagonalCounter_i;    
+  workRange.z =  (blockSize * blockIdx.x) +(numBlocks*blockSize*diagonalCounter_j) ;
+  workRange.w = j_end;
+  
   
   while ( stillWorking ) {
-
-    //  TODO: input the right formula to the index
-    // int index = blockIdx.x * blockDim.x + threadIdx.x;
-    typename vec3<T>::Type index;
-    index.i = workRange.x - threadIdx.x;
-    index.j = workRange.z + threadIdx.x;
-   
     
-    // calculate  the index particle tile  on the system... each thread will work on numTiles particles
-    typename vec3<T>::Type accel = CalculateForces(index,oldPos, numTiles);
+    typename vec3<T>::Type index;
+    index.x = (workRange.x - numTiles) - threadIdx.x;
+    index.y = (workRange.z + numTiles) + threadIdx.x;
+   
+    if(index.x > 0 || index.y < deviceNumBodies) {
+      // calculate  the index particle tile  on the system... each thread will work on numTiles particles
+      CalculateForces<T>(index,oldPos, numTiles, deviceOffset, deviceNumBodies, deltaTime, damping, vel);
+    } 
     
 
     //sync threads
     __syncthreads();
-
     
-    // one threads ask for more data ... others will idle (busy waiting)
-    receivedNewDiagonal = false;
-    if (threadIdx.x == 1) {
-      workRange = GetDiagonalLine(diagonalManagerVector, numTiles, deviceNumBodies, mutex);  // this will be shared between all the threads
-      receivedNewDiagonal = true;
-      //nothing else to work
-      if (workRange.x < 0)
-      {
-        stillWorking = false;
-      }
-    } else {
-      while(!receivedNewDiagonal) continue;   
+    if (threadIdx.x  == 0) {
+            
+     diagonalCounter_j++;            
+     j_end = blockSize * blockIdx.x + blockSize + (numBlocks*blockSize*diagonalCounter_j);
+     j_end = (j_end > deviceNumBodies) ? deviceNumBodies - diagonalCounter_i : j_end;
+     
+     workRange.x = deviceNumBodies - diagonalCounter_i;
+     workRange.y = deviceNumBodies -diagonalCounter_i;
+     workRange.z =  (blockSize * blockIdx.x) +(numBlocks*blockSize*diagonalCounter_j) ;
+     workRange.w = j_end;
+
+     //  we reached the end of the diagonal line
+     if(workRange.z >= (deviceNumBodies - diagonalCounter_i)) {
+       diagonalCounter_j = 0;
+       atomicAdd(&block_atomic, 1);
+       //busy waiting
+       while (block_atomic < actualNumBlocks) continue;
+
+       if (blockIdx.x == 0) {
+         atomicSub(&diagonalCounter_i, 1);
+         if(diagonalCounter_i < 0) {
+           atomicSub(&actualNumBlocks, 1);
+           stillWorking = false;
+         }
+         block_atomic = 0;
+       }
+            
+       int j_end = blockSize * blockIdx.x + blockSize + (numBlocks*blockSize*diagonalCounter_j);
+       j_end = (j_end > deviceNumBodies) ? deviceNumBodies - diagonalCounter_i : j_end;
+     
+       workRange.x = deviceNumBodies - diagonalCounter_i;
+       workRange.y = deviceNumBodies -diagonalCounter_i;    
+       workRange.z =  (blockSize * blockIdx.x) +(numBlocks*blockSize*diagonalCounter_j) ;
+       workRange.w = j_end;
+       
+       // this block wont work anymore
+       if(workRange.z >= (deviceNumBodies - diagonalCounter_i) && blockIdx.x != 0) {
+         atomicSub(&actualNumBlocks, 1);
+         blockEnd = true;
+       }
+       
+     }
+       
     }
     
-    
+    __syncthreads();
+
+    //end the idle block threads
+    if (blockEnd) {
+      return;
+    }
+
   }
 
 }
@@ -429,15 +412,17 @@ void integrateNbodySystem(DeviceData<T> *deviceData,
 
         int numBlocks = (deviceData[dev].numBodies + blockSize-1) / blockSize;
         int numTiles = (numBodies + blockSize - 1) / blockSize;
+        numTiles = 10;
         int sharedMemSize = blockSize * 4 * sizeof(T); // 4 floats for pos
 
-        integrateBodies<T><<< numBlocks, blockSize, sharedMemSize >>>
-        ((typename vec4<T>::Type *)deviceData[dev].dPos[1-currentRead],
-         (typename vec4<T>::Type *)deviceData[dev].dPos[currentRead],
-         (typename vec4<T>::Type *)deviceData[dev].dVel,
-         deviceData[dev].offset, deviceData[dev].numBodies,
-         deltaTime, damping, numTiles);
-
+        integrateBodiesHalfWork<T><<< numBlocks, blockSize, sharedMemSize >>>
+            ((typename vec4<T>::Type *)deviceData[dev].dPos[1-currentRead],
+             (typename vec4<T>::Type *)deviceData[dev].dPos[currentRead],
+             (typename vec4<T>::Type *)deviceData[dev].dVel,
+             deviceData[dev].offset, deviceData[dev].numBodies,
+             deltaTime, damping, numTiles,
+             blockSize, numBlocks);
+        
         if (numDevices > 1)
         {
             checkCudaErrors(cudaEventRecord(deviceData[dev].event));
