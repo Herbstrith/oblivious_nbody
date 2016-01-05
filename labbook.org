@@ -198,3 +198,87 @@ After a week trying many makefile configurations and cmake configurations. Nothi
 I'll use the cuda Gems3 nbody code and just change the actuall kernel.
 This will also simplificate the performance analisys and make it more accurate, since
 we will be using the same data structures and initialization.
+* ERAD 2016 Paper
+DEADLINE: <2016-01-08 Sex>
+** TODO Have Working version of the half work
+** TODO Performance Analysis runs
+** TODO Write
+* <04-01-2016> No recursion Algorithm Second approach
+ Instead of using an atomic diagonal manager we can simply use the blockIdx.
+ I ended up on this formula:
+#+BEGIN_SRC C
+ workRange.x = deviceNumBodies - diagonalCounter_i;
+ workRange.y = deviceNumBodies -diagonalCounter_i;    
+ workRange.z =  (blockSize * blockIdx.x) +(numBlocks*blockSize*diagonalCounter_j) ;
+ workRange.w = blockSize * blockIdx.x + blockSize + (numBlocks*blockSize*diagonalCounter_j);
+#+END_SRC
+
+ This way every block on the gpu will grab a chunk of the diagonal line to work on it. We also dont need to have a 
+ mutex between the blocks, since every block will grab a chunk of the diagonal line
+ and, if they finish their work, they can grab other chunk of the line without interfering with adjacent blocks.
+ But the workRange update must be done only by one thread inside the block, since there is a race condition in the
+ workRange update, so we have a slowdown at this point. 
+ Also every block must change the line together. Therefore if a block end his work early, we will have a busy waiting
+ at this point. Like the workRange update, only one block can update the lineCounter, for we also have a race condition.
+ 
+ Also our function to calculate the force differs from the gpu Gems.
+ 
+#+BEGIN_SRC C
+ // work on the tile
+  for (int tile_i = 0; tile_i < numTiles; tile_i++)
+  {
+    int index_i = (index.x - tile_i - index.y)*deviceNumBodies + (index.y  + tile_i);
+    typename vec4<T>::Type pos_i = oldPos[index_i];
+    
+    for (int tile_j = tile_i+1; tile_j < numTiles; tile_j++) 
+    {
+      int index_j = (index.x - tile_j - index.y)*deviceNumBodies + (index.y  + tile_j);
+      typename vec4<T>::Type pos_j = oldPos[index_j];
+
+      typename vec3<T>::Type accel = {0.0f, 0.0f, 0.0f};
+
+      //aceleration, body 1 , body 2
+      accel = bodyBodyInteraction<T>(accel, pos_i, pos_j);
+
+      // acceleration = force / mass;
+      // new velocity = old velocity + acceleration * deltaTime
+      // note we factor out the body's mass from the equation, here and in bodyBodyInteraction
+      // (because they cancel out).  Thus here force == acceleration
+      typename vec4<T>::Type velocity = vel[deviceOffset + index_i];
+    
+      velocity.x += accel.x * deltaTime;
+      velocity.y += accel.y * deltaTime;
+      velocity.z += accel.z * deltaTime;
+
+      velocity.x *= damping;
+      velocity.y *= damping;
+      velocity.z *= damping;
+
+      // new position = old position + velocity * deltaTime
+      pos_i.x += velocity.x * deltaTime;
+      pos_i.y += velocity.y * deltaTime;
+      pos_i.z += velocity.z * deltaTime;
+    
+      // we also update the second particle with the inverse force (velocity) by the principle of newtons third law
+      pos_j.x += -velocity.x * deltaTime;
+      pos_j.y += -velocity.y * deltaTime;
+      pos_j.z += -velocity.z * deltaTime;
+    }
+    
+#+END_SRC
+
+ Where every thread gets a chunk (size NumTile) of the block work. Here is where we also end up losing performance, all due to
+ the need of updating the position and velocity at every iteration (which works best in the cpu approach which was the proposal).
+
+** Performance Analysys (Quick&dirty)
+ With a rude implementation of this idea, and after some sample runs we end up with very poor results:
+ With a numbodies of 1000 and 10 iterations:
+
+ Gpu Gems original implementation: average on 0.24 ms per iteration
+ Half work prototype implementation: average on 1.40 ms per iteration
+
+ Even though we are not properly distributing the work on threads ... at most we could optimize the work by half
+ still gettin on about 0.7 ms which is still orders of magnitude slower.
+ 
+ 
+ 
