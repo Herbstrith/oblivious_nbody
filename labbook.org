@@ -203,6 +203,8 @@ DEADLINE: <2016-01-08 Sex>
 ** TODO Have Working version of the half work
 ** TODO Performance Analysis runs
 ** TODO Write
+Couldn't meet the deadline.
+
 * <04-01-2016> No recursion Algorithm Second approach
  Instead of using an atomic diagonal manager we can simply use the blockIdx.
  I ended up on this formula:
@@ -281,4 +283,28 @@ DEADLINE: <2016-01-08 Sex>
  still gettin on about 0.7 ms which is still orders of magnitude slower.
  
  
- 
+* <09-01-2016> No recursion Algorithm Memory management
+A thread block will allways use most of the same J bodies throught the execution. These could be loaded on shared memory to achieve
+best performance.
+
+* <10-01-2016> On the Half Work Algorithm efficiency
+** All-pair
+*** N iterations
+The all-pairs nbody problem is almost an embarrassingly parallel problem, so one could assume (if such parallel power would be avaiable) it takes N iterations to finish it.
+
+** Half-Work
+*** N iterations
+Now the half-work approach isn't as parallelizable as the all-pair. Assuming we could process an entire diagonal line parallely, we
+still would take N steps to finish it.
+*** Less work
+The advantage over the all-pairs algorithm would be that at each iteration
+we would have less and less work to do each step. Also, not so advantageous on a gpgpu.
+*** Synchronization overhead
+There's the need for barriers and mutexes for race conditions. Highly undesired on a gpgpu.
+The barriers are needed on both the recursive and no-recursive approachs. 
+On the recursive approach we would also have all the Kernel launch's (dynamic parallelism) overhead.
+*** No coalesced memory access
+Couldn't find a efficient way to access the memory on the no-recursive approach. 
+The original approach based on recursion has the property of being cache-friendly.
+But the recursive approach was designed and tested on a CPU which has more cache memory at it's disposal.
+
