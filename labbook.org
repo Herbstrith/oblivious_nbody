@@ -308,3 +308,37 @@ Couldn't find a efficient way to access the memory on the no-recursive approach.
 The original approach based on recursion has the property of being cache-friendly.
 But the recursive approach was designed and tested on a CPU which has more cache memory at it's disposal.
 
+* <11-01-2016> No recursion performance
+Decomposing the execution of the half work algorithm showed us that:
+Total Synchronization overhead (Removed all the calculation): 0.855 ms average time on 1000 particles
+Parcial Synchronization overhead ( removed all the calculation and the between blocks sync ): 0.272 ms average time on 1000 particles
+Gems3 original: 0.107 ms average time on 1000 particles
+
+Conclusion: huge bottleneck on the synchronization step. Can't see any way to overpass this, thus rendering
+this approach not efficient.
+
+* <11-01-2016> On dynamic parallelism
+http://ppomorsk.sharcnet.ca/CSE746/lecture6_CSE746_2014.pdf
+http://users.ece.gatech.edu/~sudha/academic/class/ece8823/Lectures/Module-6-Microarchitecture/cuda-dyn-par.pdf
+
+http://devblogs.nvidia.com/parallelforall/a-cuda-dynamic-parallelism-case-study-panda/
+This last one presents two statements that are relevant to our work (What Dynamic Parallelism is Not section):
+
+"With all the advantages of Dynamic Parallelism, however, it is also important to understand when not to use it.
+In all of the examples in this series of posts, when a child kernel is launched, it always consisted of a large
+number of threads, and also of a large number of thread blocks. It is possible in some cases for each child grid 
+to consist of a single thread block, which still contains O(100) threads. However, it is a bad idea to start a child
+grid with just a few threads. This would lead to severe under-utilization of GPU parallelism, since only a few
+threads in a warp would be active, and there would not be enough warps. This would also lead to GPU execution
+dominated by kernel launch latencies."
+
+Which would be just like our case where we will start with one single thread calling the Triangle() function and 
+every other thread spawning 3 other threads and so on.
+
+"We can now see that Dynamic Parallelism is useful when it results in fat but relatively shallow trees. Adaptive
+ grid algorithms often result in such trees. Traditional tree processing, in contrast, usually involves trees with
+ small node degree but large depth, and is not a good use case for dynamic parallelism."
+
+Our tree will not be shallow since it needs to  have enough chunks to be computaded in parallel.
+Adding this to the synchronization need, doesnt lead to a good expectation.
+
