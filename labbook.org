@@ -339,6 +339,36 @@ every other thread spawning 3 other threads and so on.
  grid algorithms often result in such trees. Traditional tree processing, in contrast, usually involves trees with
  small node degree but large depth, and is not a good use case for dynamic parallelism."
 
-Our tree will not be shallow since it needs to  have enough chunks to be computaded in parallel.
+Our tree will not be shallow since it needs to  have enough chunks to be computed in parallel.
 Adding this to the synchronization need, doesnt lead to a good expectation.
+
+* <20-01-2016> On dynamic parallelism sync
+We still have the need for between blocks synchronization. As experimented before, this kind of synchronization
+kills the gpu performance. 
+
+#+BEGIN_SRC C
+void triangle(){
+   triangle<<>>();
+   triangle();
+
+   sync();  // 1 new triangle spawn and we need to syncrhonize
+
+   rect();
+
+}
+
+void rect() {
+  rect<<>>();
+  rect();
+
+  sync();  // 1 new block spawn created and we need to synchronize
+
+  rect<<>>();
+  rect();
+
+}
+#+END_SRC
+
+In conclusion, the recursive approach will have the same con of the no-recursive algorithm, plus the cost of the unusual use of
+dynamic parallelism.
 
