@@ -372,3 +372,24 @@ void rect() {
 In conclusion, the recursive approach will have the same con of the no-recursive algorithm, plus the cost of the unusual use of
 dynamic parallelism.
 
+
+* <20-02-2016> Thoughts on an MPI implementation
+  This algorithm might run better at an mpi master slave environment. No more race conditions.
+** Master
++ Copy the particles array to the workers (Network cost)  ( we could make use of the "cache locallity" advantage of the algorithm and send only part of the array)
++ Divide up the "diagonals" akin to the no recursion Algorithm 
++ Do
+++ Send diagonal limits to Workers ( small network cost, just sending 4 grid points (8 integers))
+++ Receive diagonals from Workers and build the output array (Network cost)
+++ Send remaining diagonals for the worker
++ while not finished
++ Finish
+
+** Worker
++ Receive the particles array  ( we could make use of the "cache locallity" advantage of the algorithm and receive  only part of the array)
++ Receive the "diagonal" to work
++ Compute the diagonal in parallel
++ Send the diagonal area calculated to Master (Network cost)
++ Wait for new "diagonal" or finish
+
+  
