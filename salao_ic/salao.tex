@@ -5,7 +5,7 @@
 \usepackage{float}
 \usepackage{adjustbox}
 \usepackage{amsmath}
-\usepackage[margin=1.5cm,top=0cm]{geometry}
+\usepackage[margin=2.5cm,top=0.2cm]{geometry}
 
 % Exigencias do formato:
 \usepackage[T1]{fontenc}
@@ -23,7 +23,8 @@
 \begin{document}
 
 
-\title{GPGPU Oblivious N-body}
+\title{Explorando a Terceira Lei de Newton para \\ Simulação N-Corpos em
+  uma Plataforma GPU}
 
 \author{Vinícius Herbstrith (bolsista), Lucas Mello Schnorr (orientador) \\
 Instituto de Informática -- Universidade Federal do Rio Grande do Sul}
@@ -33,25 +34,67 @@ Instituto de Informática -- Universidade Federal do Rio Grande do Sul}
 
 %\review{Contexto}
 
-Simulações n-body são simulações de um sistema de partículas sobre a influência das forças físicas externas e forças geradas pelas outras partículas do mesmo sistema. Simulações N-body são largamente aplicadas em astrofísica, fisica de plasma e dinâmica molecular.
-A simulação ocorre em intervalos de tempo onde, para cada intervalo e para cada partícula, é calculada a força resultante que uma partícula  sofre devido a interação com as outras. Devido a necessidade de calcular a força entre todos os pares de corpos a cada intervalo de tempo, temos uma complexidade O($N^2$). 
+Simulações N-corpos são simulações de um sistema de partículas sobre a
+influência das forças físicas externas e forças geradas pelas outras
+partículas do mesmo sistema. Simulações deste tipo são largamente
+aplicadas em astrofísica, física de plasma e dinâmica molecular.  A
+simulação ocorre em intervalos de tempo onde, para cada intervalo e
+para cada partícula, é calculada a força resultante que uma partícula
+sofre devido a interação com as outras. Devido a necessidade de
+calcular a força entre todos os pares de corpos a cada intervalo de
+tempo, temos uma complexidade O($N^2$), onde N é a quantidade de
+partículas presentes no sistema.
+%
+A simulação N-corpos pode ser otimizada fazendo-se uso da
+paralelização. Como não existem dependência de dados, é possível
+calcular cada corpo em paralelo, para uma complexidade de tempo O(N).
+%Ainda sim, mesmo que o problema seja trivialmente paralelo, o número
+%de corpos usados em simulações atinge a ordens de trilhões, fazendo
+%que otimizações na paralelização sejam de grande interesse.
 
-A simulação através da força bruta, comparando todos os corpos entre si, pode ser otimizada fazendo-se uso da paralelização. Por não existirem
-barreiras ou depndência de dados, seria possível calcular cada corpo em paralelo, reduzindo a complexidade de tempo para O(N).
-Ainda sim, mesmo que o problema seja trivialmente paralelo, o número de corpos usados em simulações atinge a ordens de trilhões, fazendo que otimizações na paralelização sejam de grande interesse.
+GPUs são uma arquitetura many-core de alto desempenho. Para se tirar
+proveito deste potencial, os algoritmos geralmente precisam ser
+reformulados levando em conta as peculiaridades da GPU. Uma proposta
+de algoritmo para simulação N-corpos é apresentada no livro GPU Gems 3,
+onde os autores extrairam um excelente desempenho da GPU.
 
-GPUs apresentam uma arquitetura many-core de alto desempenho que possibilitam uma alta taxa de computação e produtividade. Para se tirar proveito deste alto desempenho, os algoritmos geralmente precisam ser reformulados levando em conta as peculiaridades da GPU. Uma proposta de algoritmo para simulação n-body é apresentada no livro GPU gems 3, onde os autores extrairam um excelente desempenho da gpu.
+Uma algoritmo N-corpos visando a otimização da paralelização foi
+proposta por Halpem na CppCon 2014. Ele usa a terceira lei de Newton,
+onde o efeito de um corpo $X$ sobre outro corpo $Y$ é idêntico ao
+efeito de $Y$ sobre $X$.  Reduz-se então pela metade o número de
+interações entre corpos.  O autor propõe o uso de recursão paralela
+para evitar as condições de corrida do algoritmo.
 
-Uma algoritmo visando a otimização do processamento e da paralelização foi proposta por Pablo Halpem em sua palestra na CppCon 2014.Para cada interação entre particulas, é calculada a força resultante da interação e aplica-se o valor resultante em um particulas e o negativo do valor resultante à outra de acordo com a terceira lei de Newton. Desta forma, é possível reduzir pela metade o número de interações, atingindo uma complexidade de O(N). No entanto, este algoritmo apresenta condições de corrida o que torna a sua paralelização não mais trivial. O autor propõe uma paralelização fazendo uso de recursão para evitar as condições de corrida.
+O objetivo deste trabalho é a implementação deste algoritmo em uma
+GPU, combinando a otimização e a capacidade do paralelismo massivo da
+GPGPU. O desafio é evitar o problema de condições de corrida do
+algoritmo, que não pode ser através da recursão, que apresenta um
+baixo desempenho em um ambiente GPGPU. O algoritmo proposto ataca o
+problema de uma forma ascendente, começando a partir do que seriam as
+folhas de uma árvore recursiva. Foi necessário a adição de um esquema
+mestre-trabalhador para fazer o controle das condições de corrida, tendo
+em vista que a inconsistência ocorre quando dois nós de níveis
+diferentes da árvore recursiva são processados em paralelo.
 
+A análise de desempenho do algoritmo foi feita com um conjunto de
+corpos gerados aleatoriamente. A máquina usada para os testes possui
+processador Intel i7-4770 CPU (3.40GHz), 8GiB DIMM DDR3(1.6GHz) e uma
+GPU NVIDIA GTX 760 (1152 cuda cores, 980Mhz). Como base de comparação,
+usamos o algoritmo N-corpos do livro GPU gems 3 com os mesmos parâmetros
+de entrada. Para diferentes tamanhos de entrada, foram feitas 15
+execuções de forma se obter uma amostra significativa. Comparando os
+tempos, tivemos um resultado até seis vezes mais lento com a nossa
+proposta. O baixo desempenho se dá por conta do uso de mutex para
+realizar o controle mestre-trabalhador, um mecanismo que acaba sendo
+muito custoso no ambiente GPGPU, custo este mais alto que o
+processamento reduzido dos cálculos.
 
-O objetivo deste trabalho é a implementação deste algoritmo em uma GPU, combinando a otimização e a capacidade do paralelismo massivo da GPGPU. O desafio é circundar o problema de condições de corrida do algoritmo, que não pode ser através da recursão, que apresenta um baixo desempenho em um ambiente GPGPU. O algoritmo proposto é ataca o problema de uma forma bottom-up, começando a partir do que seriam as folhas de uma árvore recursiva. Foi necessário a adição de um esquema Mestre-escravo para fazer o controle das condições de corrida, tendo em vista que a inconsistência ocorre quando dois nós de níveis diferentes da árvore recursiva são processados em paralelo.
-
-A análise de desempenho do algoritmo foi feita com um conjunto de corpos gerados aleatoriamente. A máquina
-usada para os testes possui processador Intel i7-4770 CPU (3.40GHz),
-8GiB DIMM DDR3(1.6GHz) e uma GPU NVIDIA GTX 760 (1152 cuda cores, 980Mhz). Como base de comparação, usamos o algoritmo n-body do livro GPU Gems 3 com os mesmos parâmetros de entrada. Para diferentes tamanhos de entrada, foram feitas 15 execuções de forma se obter uma amostra significativa. Comparando os tempos, tivemos um resultado até 6 vezes mais lento com a nossa proposta. O baixo desempenho se da por conta do uso de Mutex para realizar o controle mestre-escravo, um mecanismo que acaba sendo muito custoso no ambiente GPGPU, custo este mais alto que o processamento reduzido dos cálculos.  
-
-Mesmo com este resultado negativo, o algoritmo é promissor. Acreditamos que uma implementação em um ambiente em cluster possa tirar um maior proveito das melhorias do algoritmo, sem ser penalizado fortemente pela condição de corrida, onde podemos ter um esquema mestre-escravos para um melhor controle da condição de corrida.
+Mesmo com este resultado negativo, o algoritmo é
+promissor. Acreditamos que uma implementação em um ambiente em cluster
+possa tirar um maior proveito das melhorias do algoritmo, sem ser
+penalizado fortemente pela condição de corrida, onde podemos ter um
+esquema mestre-trabalhador para um melhor controle da condição de
+corrida.
 
 
 \medskip
